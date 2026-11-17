@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from './api'
+import { welcomeSeen } from './components/Welcome'
 import type {
   Bench, Catalog, Category, ExpDetail, ExpSummary, Reading, SimEvent, StepResult, VesselView,
 } from './types'
@@ -63,6 +64,8 @@ interface State {
   panel: 'guide' | 'vessel' | 'journal'
   showReadings: boolean
   lastNewEvent: number
+  ctx: { v: string; x: number; y: number } | null
+  welcome: boolean
   init: () => Promise<void>
   goHome: () => void
   openSandbox: (fresh?: boolean) => void
@@ -82,6 +85,8 @@ interface State {
   setAutoplay: (on: boolean) => void
   resetBench: () => void
   toggleReadings: () => void
+  setCtx: (c: State['ctx']) => void
+  setWelcome: (on: boolean) => void
 }
 
 let eventSeq = 1
@@ -153,6 +158,8 @@ export const useLab = create<State>((set, get) => ({
   panel: 'guide',
   showReadings: true,
   lastNewEvent: 0,
+  ctx: null,
+  welcome: false,
 
   init: async () => {
     try {
@@ -164,14 +171,14 @@ export const useLab = create<State>((set, get) => ({
   },
 
   goHome: () => {
-    set({ mode: 'home', link: null, pick: null, dialog: null, autoplay: false })
+    set({ mode: 'home', ctx: null, welcome: false, link: null, pick: null, dialog: null, autoplay: false })
     if (location.hash) history.replaceState(null, '', location.pathname)
   },
 
   openSandbox: (fresh = false) => {
     const saved = fresh ? null : loadSandbox()
     set({
-      mode: 'lab', experiment: null, stepDone: [], events: [], selected: null, titration: {}, panel: 'vessel',
+      mode: 'lab', experiment: null, stepDone: [], ctx: null, welcome: !welcomeSeen(), events: [], selected: null, titration: {}, panel: 'vessel',
       bench: saved || { vessels: {}, t: 0, seq: 0, links: [] }, views: {}, readings: {}, autoplay: false,
       queue: saved && Object.keys(saved.vessels).length ? [] : [...DEFAULT_SANDBOX],
     })
@@ -185,7 +192,7 @@ export const useLab = create<State>((set, get) => ({
       set({
         mode: 'lab', experiment: detail, stepDone: detail.steps.map(() => false), events: [], selected: null,
         titration: {}, bench: res.bench, views: res.views, readings: res.readings, queue: [], panel: 'guide',
-        autoplay: false, running: true, link: null, pick: null, dialog: null,
+        autoplay: false, running: true, link: null, pick: null, dialog: null, ctx: null, welcome: !welcomeSeen(),
       })
       history.replaceState(null, '', `#/doswiadczenie/${id}`)
     } catch (e: any) {
@@ -325,6 +332,8 @@ export const useLab = create<State>((set, get) => ({
   },
 
   toggleReadings: () => set({ showReadings: !get().showReadings }),
+  setCtx: (c) => set({ ctx: c }),
+  setWelcome: (on) => set({ welcome: on }),
 }))
 
 // pętla symulacji: co ~0,5 s rzeczywistego czasu wysyłamy krok o długości 0,5·prędkość

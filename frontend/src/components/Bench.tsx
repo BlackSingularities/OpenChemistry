@@ -349,7 +349,15 @@ export default function Bench() {
           const burn = v.type === 'crucible' || v.type === 'evap_dish'
           return (
             <div key={p.id} className={`vessel${sel ? ' selected' : ''}${isTargetable ? ' targetable' : ''}${isDrag ? ' dragging' : ''}`}
-                 style={style} onPointerDown={(e) => onVesselDown(e, p.id)}>
+                 style={style} onPointerDown={(e) => onVesselDown(e, p.id)}
+                 onContextMenu={(e) => {
+                   e.preventDefault()
+                   e.stopPropagation()
+                   const st = useLab.getState()
+                   st.setLink(null)
+                   st.select(p.id)
+                   st.setCtx({ v: p.id, x: e.clientX, y: e.clientY })
+                 }}>
               {v.heat && !v.parent && v.type !== 'burette' && (
                 <div className={`heat-stand heat-${v.heat}`} style={{ top: p.h, width: p.w }}>
                   {(v.heat === 'alcohol' || v.heat === 'bunsen') && !TUBES.has(v.type) && v.type !== 'spoon' && <Tripod width={p.w} />}

@@ -6,12 +6,12 @@ import {
 import { useLab } from '../store'
 import { applyTool } from './tools'
 
-const HEAT_OPTS = [
+export const HEAT_OPTS = [
   ['', 'Bez ogrzewania'], ['alcohol', 'Palnik spirytusowy'], ['bunsen', 'Palnik gazowy'], ['hotplate', 'Płyta grzejna'],
   ['water_bath', 'Łaźnia wodna 80 °C'], ['ice_bath', 'Łaźnia lodowa 0 °C'],
 ] as const
 
-const TESTS = [
+export const TESTS = [
   ['glowing_splint', 'Żarzące się łuczywo'], ['burning_splint', 'Płonące łuczywo'], ['gas_litmus', 'Papierki lakmusowe (gaz)'],
   ['univ_paper', 'Papierek uniwersalny'], ['litmus_red', 'Czerwony papierek lakmusowy'], ['litmus_blue', 'Niebieski papierek lakmusowy'],
   ['flame_test', 'Próba płomieniowa'], ['cobalt_glass', 'Płomień przez szkło kobaltowe'], ['smell', 'Zapach (ostrożnie)'],

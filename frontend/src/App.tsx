@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Beaker, BookOpen, Eye, EyeOff, FlaskConical, Gauge, Home as HomeIcon, Pause, Play, RotateCcw, Shapes, X } from 'lucide-react'
+import { Beaker, CircleHelp, BookOpen, Eye, EyeOff, FlaskConical, Gauge, Home as HomeIcon, Pause, Play, RotateCcw, Shapes, X } from 'lucide-react'
 import { useLab } from './store'
 import { useDrag } from './dnd'
 import Home from './components/Home'
@@ -8,6 +8,8 @@ import Shelf from './components/Shelf'
 import ActionBar from './components/ActionBar'
 import SidePanel from './components/SidePanel'
 import Dialogs from './components/Dialogs'
+import ContextMenu from './components/ContextMenu'
+import Welcome from './components/Welcome'
 import { fmt } from './chem'
 
 const SPEEDS = [1, 2, 5, 10, 20]
@@ -44,6 +46,8 @@ export default function App() {
       <TopBar />
       {mode === 'home' ? <Home /> : <Lab />}
       <Dialogs />
+      {mode === 'lab' && <ContextMenu />}
+      {mode === 'lab' && <Welcome />}
       <DragGhost />
       {toast && <div className="toast" onClick={() => useLab.getState().setToast(null)}>{toast}</div>}
       {mode === 'home' && <Footer />}
@@ -86,6 +90,9 @@ function TopBar() {
           <span className="clock">{fmtTime(t)}</span>
           <button className="icon-only" onClick={() => useLab.getState().toggleReadings()} title="Pokaż/ukryj odczyty przy naczyniach">
             {showReadings ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+          <button className="icon-only" onClick={() => useLab.getState().setWelcome(true)} title="Jak korzystać z laboratorium" aria-label="Instrukcja">
+            <CircleHelp size={16} />
           </button>
           <button className="icon-only" onClick={() => useLab.getState().resetBench()} title={experiment ? 'Zacznij doświadczenie od nowa' : 'Wyczyść stół'}>
             <RotateCcw size={16} />
