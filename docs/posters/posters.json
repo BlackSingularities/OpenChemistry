@@ -1,0 +1,41 @@
+{
+  "slug": "openchemistry",
+  "name": "OpenChemistry",
+  "label": "wirtualne laboratorium chemiczne",
+  "icon": "icon.png",
+  "url": "https://redzikowski.com/chemia/",
+  "posters": [
+    {
+      "platform": "web",
+      "file": "web.png",
+      "title": "Laboratorium chemiczne *w przeglądarce*",
+      "lead": "199 doświadczeń krok po kroku i swobodne eksperymenty. Wyniki liczy prawdziwy silnik chemiczny: pH, osady, gazy, ciepło i elektroliza.",
+      "shots": [
+        {
+          "src": "../screenshots/web/p1-osady.png",
+          "caption": "Strącanie halogenków srebra"
+        },
+        {
+          "src": "../screenshots/web/p2-miareczkowanie.png",
+          "caption": "Miareczkowanie z krzywą pH"
+        },
+        {
+          "src": "../screenshots/web/p3-elektroliza.png",
+          "caption": "Elektroliza wody 2 : 1"
+        }
+      ],
+      "features": [
+        "199 doświadczeń",
+        "188 odczynników",
+        "pH z bilansu ładunku",
+        "iloczyny rozpuszczalności",
+        "gazy i ciepło",
+        "za darmo, bez logowania"
+      ],
+      "meta": "bez instalacji i logowania · komputer, tablet, telefon",
+      "layout": "windows",
+      "ctaKicker": "Otwórz za darmo",
+      "ctaTitle": "OpenChemistry w przeglądarce"
+    }
+  ]
+}

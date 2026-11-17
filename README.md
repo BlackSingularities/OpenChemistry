@@ -1,5 +1,13 @@
 # OpenChemistry – wirtualne laboratorium chemiczne
 
+<!-- posters:start -->
+<p align="center">
+  <img src="docs/posters/web.png" alt="OpenChemistry – web" width="460">
+</p>
+
+<p align="center"><a href="https://redzikowski.com/chemia/">redzikowski.com/chemia/</a></p>
+<!-- posters:end -->
+
 Darmowe, rozbudowane laboratorium chemiczne w przeglądarce: **199 gotowych doświadczeń** w 14 działach,
 **188 odczynników**, 20 rodzajów sprzętu i tryb swobodnego eksperymentowania. Bez logowania, bez reklam.
 
