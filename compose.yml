@@ -1,0 +1,33 @@
+# OpenChemistry pod https://redzikowski.com/chemia/ (kontener w sieci webproxy, ruch przez proxy_nginx).
+name: chemia
+services:
+  chemia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chemia:latest
+    container_name: chemia
+    restart: unless-stopped
+    init: true
+    networks:
+      - webproxy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.5
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  webproxy:
+    name: webproxy
+    external: true

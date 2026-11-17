@@ -1,0 +1,66 @@
+name: Test and deploy
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: chemia-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Testy silnika i wszystkich doświadczeń
+        working-directory: backend
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -q
+      - name: Build frontendu
+        working-directory: frontend
+        env:
+          BASE_PATH: /chemia/
+        run: |
+          npm ci
+          npm run build
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wdrożenie przetestowanego commita
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/chemia_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/chemia_deploy ~/.ssh/known_hosts
+          trap 'rm -f ~/.ssh/chemia_deploy' EXIT
+          git archive --format=tar.gz "$GITHUB_SHA" | ssh -i ~/.ssh/chemia_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=20 "$DEPLOY_USER@$DEPLOY_HOST" "deploy $GITHUB_SHA"
+      - name: Sprawdzenie publicznego adresu
+        run: |
+          curl --fail --silent --show-error https://redzikowski.com/chemia/api/health
+          curl --fail --silent --show-error https://redzikowski.com/chemia/ -o /dev/null
