@@ -6,6 +6,7 @@ reakcje kinetyczne, wymiana gazów, przepływy, bilans cieplny, równowagi i str
 """
 from __future__ import annotations
 
+import copy
 import math
 import re
 
@@ -235,6 +236,11 @@ def put(bench, dst, portion, t, events: Events, mix_heat=True):
     tot_c = c_dst + c_por
     if tot_c > 0:
         dst["T"] = (dst["T"] * c_dst + portion["T"] * c_por) / tot_c
+    cap_l = e.cap if e.kind != "arm" else 30.0
+    over = dst["vol"] + dst.get("org_vol", 0.0) - cap_l
+    if over > 1e-6 and cap_l > 0:
+        _spill(dst, over)
+        events.add(t, dst["id"], "warn", "Ciecz przelewa się przez brzeg naczynia – nadmiar wylał się na stół.")
     if h1 is not None:
         h3, o3 = _h_oh_moles(dst["aq"], dst["vol"], dst["T"])
         neut = max((h1 + h2) - h3, (o1 + o2) - o3, 0.0)
@@ -253,6 +259,24 @@ def put(bench, dst, portion, t, events: Events, mix_heat=True):
         dst["T"] += q / heat_capacity(dst)
     dst["stable"] = False
     _fit_headspace(bench, dst, t, events)
+
+
+def _spill(v, over):
+    """Usuwa nadmiar cieczy (najpierw warstwa organiczna z wierzchu, potem roztwór i zawiesina)."""
+    o = min(v.get("org_vol", 0.0), over)
+    if o > 0:
+        f = o / v["org_vol"]
+        for k in list(v["org"]):
+            v["org"][k] *= 1 - f
+        v["org_vol"] -= o
+        over -= o
+    if over > 0 and v["vol"] > 0:
+        f = min(1.0, over / v["vol"])
+        for k in list(v["aq"]):
+            v["aq"][k] *= 1 - f
+        for st in v["solids"].values():
+            st["n"] -= st["n"] * st.get("susp", 0.0) * f
+        v["vol"] -= v["vol"] * f
 
 
 def _fit_headspace(bench, v, t, events):
@@ -1502,7 +1526,16 @@ def step(bench: dict, actions: list, dt: float):
                 put(bench, bench["vessels"][v["target"]], take(v, ml), bench["t"], events)
         for v in order:
             if v["id"] in bench["vessels"]:
-                sps[v["id"]] = _process_vessel(bench, v, sub, bench["t"], events)
+                backup = copy.deepcopy(v)
+                try:
+                    sps[v["id"]] = _process_vessel(bench, v, sub, bench["t"], events)
+                except Exception:  # pragma: no cover - awaryjnie: naczynie zostaje w poprzednim stanie
+                    import logging
+                    logging.getLogger("chemia").exception("błąd symulacji naczynia %s", v["id"])
+                    bench["vessels"][v["id"]] = backup
+                    v.clear()
+                    v.update(backup)
+                    sps[v["id"]] = None
     if n_sub == 0:
         for v in bench["vessels"].values():
             if v.get("arms"):

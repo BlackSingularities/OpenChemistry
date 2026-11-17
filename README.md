@@ -30,7 +30,16 @@ Wyniki nie są nagranymi animacjami – liczy je prawdziwy silnik chemiczny w Py
 - **Barwy z prawa Lamberta-Beera** – intensywność zależy od stężenia i grubości warstwy.
 
 Każde doświadczenie ma automatyczny test (`backend/tests`), który wykonuje wszystkie kroki na silniku
-i sprawdza, czy zachodzi opisana obserwacja.
+i sprawdza, czy zachodzi opisana obserwacja. Dodatkowo:
+
+- **macierz kation × anion** (`test_realism.py`) – ok. 190 par porównanych z tablicą rozpuszczalności
+  (osad powstaje dokładnie wtedy, gdy w rzeczywistości; uwzględnione kompleksy i współczynniki aktywności),
+- **losowe scenariusze „wszystko ze wszystkim”** (`test_fuzz.py`) – dowolne odczynniki, ogrzewanie, przelewanie,
+  testy; sprawdzana jest stabilność i fizyczna poprawność wyników,
+- **odczynniki z półki** nie mogą same wytrącać osadów (`test_reagents.py`).
+
+W trybie doświadczenia półka domyślnie pokazuje tylko odczynniki i sprzęt potrzebne do tego doświadczenia;
+przełącznik „Cała półka” pozwala dodać dowolną substancję – silnik policzy reakcję ogólnie.
 
 ## Technologia
 

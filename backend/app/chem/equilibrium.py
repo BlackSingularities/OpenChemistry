@@ -28,9 +28,10 @@ def _alphas(pka: tuple, ph: float) -> list[float]:
 
 
 class Speciation:
-    __slots__ = ("ph", "h", "oh", "free", "vol_l", "t", "ionic")
+    __slots__ = ("ph", "h", "oh", "free", "vol_l", "t", "ionic", "tot")
 
-    def __init__(self, ph, h, oh, free, vol_l, t):
+    def __init__(self, ph, h, oh, free, vol_l, t, ionic=0.0):
+        self.ionic = ionic
         self.ph = ph
         self.h = h
         self.oh = oh
@@ -44,6 +45,11 @@ class Speciation:
 
 _COMPLEX_BY_CENTER: dict[str, list] = {}
 _CX_BY_ID = {c.id: c for c in COMPLEXES}
+# ligand będący formą układu kwasowo-zasadowego -> (układ, indeks formy)
+LIG_SYS: dict[str, tuple[str, int]] = {}
+for _sid, _sysd in ACIDS.items():
+    for _j, _f in enumerate(_sysd.forms):
+        LIG_SYS[_f] = (_sid, _j)
 for _cx in COMPLEXES:
     _COMPLEX_BY_CENTER.setdefault(_cx.center, []).append(_cx)
 
@@ -71,10 +77,8 @@ def speciate(aq: dict, vol_ml: float, t: float) -> Speciation:
             for lig, _n in cx.ligands:
                 if lig == "OH-":
                     continue
-                if lig == "NH3":
-                    if tot.get("NH3", 0) <= 0:
-                        ok = False
-                elif tot.get(lig, 0) <= 0:
+                comp = LIG_SYS[lig][0] if lig in LIG_SYS else lig
+                if tot.get(comp, 0) <= 0:
                     ok = False
             if ok:
                 logb = cx.logb + cx.dlogb_dT * (t - 25.0)
@@ -92,13 +96,19 @@ def speciate(aq: dict, vol_ml: float, t: float) -> Speciation:
         bound: dict[str, float] = {}
         cx_conc: dict[str, float] = {}
         free_center: dict[str, float] = {}
-        nh3_tot = tot.get("NH3", 0.0)
-        nh3_alpha = _alphas(ACIDS["NH3"].pka, ph)[1] if nh3_tot > 0 else 0.0
+        bound_sys: dict[str, float] = {}
         if centers:
-            # całkowite stężenia dostępnych ligandów (dla NH3 – tylko forma niesprotonowana)
+            # dostępne ligandy (dla form układów kwasowych – udział danej formy przy tym pH)
             avail = {}
+            lig_alpha = {}
             for lig in lig_ids:
-                avail[lig] = nh3_tot * nh3_alpha if lig == "NH3" else tot.get(lig, 0.0)
+                if lig in LIG_SYS:
+                    sid, j = LIG_SYS[lig]
+                    al = _alphas(ACIDS[sid].pka, ph)[j]
+                    lig_alpha[lig] = (sid, al)
+                    avail[lig] = tot.get(sid, 0.0) * al
+                else:
+                    avail[lig] = tot.get(lig, 0.0)
             L = {lig: L_state.get(lig, avail[lig]) for lig in lig_ids}
             for lig in lig_ids:
                 L[lig] = min(max(L[lig], avail[lig] * 1e-30, 1e-300), max(avail[lig], 1e-300))
@@ -115,13 +125,15 @@ def speciate(aq: dict, vol_ml: float, t: float) -> Speciation:
                         for lig, n in cx.ligands:
                             lg += n * logL[lig]
                         terms.append((cx, lg))
-                    mx = max(0.0, max(lg for _, lg in terms))
-                    denom = math.exp(-mx * LN10) + sum(math.exp((lg - mx) * LN10) for _, lg in terms)
-                    fc = ct * math.exp(-mx * LN10) / denom
-                    free_center[cen] = fc
-                    for cx, lg in terms:
-                        cx_conc[cx.id] = ct * math.exp((lg - mx) * LN10) / denom
-                        cx_terms.append(cx)
+                    mx = 0.0
+                    for _cx, lgv in terms:
+                        if lgv > mx:
+                            mx = lgv
+                    weights = [math.exp((float(lgv) - mx) * LN10) for _cx, lgv in terms]
+                    denom = math.exp(-mx * LN10) + sum(weights)
+                    free_center[cen] = ct * math.exp(-mx * LN10) / denom
+                    for (cx, _lgv), wgt in zip(terms, weights):
+                        cx_conc[cx.id] = ct * wgt / denom
                 # suma związanych ligandów / wolny ligand
                 svals = {lig: 0.0 for lig in lig_ids}
                 for cxid, conc in cx_conc.items():
@@ -131,8 +143,9 @@ def speciate(aq: dict, vol_ml: float, t: float) -> Speciation:
                             svals[lig] += n * conc / max(L[lig], 1e-300)
                 change = 0.0
                 for lig in lig_ids:
-                    if lig == "NH3":
-                        new = nh3_tot * nh3_alpha / (1.0 + nh3_alpha * svals[lig])
+                    if lig in lig_alpha:
+                        sid, al = lig_alpha[lig]
+                        new = tot.get(sid, 0.0) * al / (1.0 + al * svals[lig])
                     else:
                         new = avail[lig] / (1.0 + svals[lig])
                     new = max(new, 1e-300)
@@ -146,10 +159,16 @@ def speciate(aq: dict, vol_ml: float, t: float) -> Speciation:
                 for lig, n in _CX_BY_ID[cxid].ligands:
                     if lig != "OH-":
                         bound[lig] = bound.get(lig, 0.0) + n * conc
+            for k in list(bound):
+                if k in LIG_SYS:
+                    sid = LIG_SYS[k][0]
+                    bound_sys[sid] = bound_sys.get(sid, 0.0) + bound.pop(k)
             for k in bound:
                 lt = tot.get(k, 0.0)
                 if bound[k] > lt:
                     bound[k] = lt
+            for k in bound_sys:
+                bound_sys[k] = min(bound_sys[k], tot.get(k, 0.0))
         charge = h - oh
         free = {} if full else None
         for k, c, z in simple:
@@ -161,8 +180,8 @@ def speciate(aq: dict, vol_ml: float, t: float) -> Speciation:
             if full:
                 free[k] = c
         for sysd, c in systems:
-            if sysd.id == "NH3":
-                c = max(c - bound.get("NH3", 0.0), 0.0)
+            if sysd.id in bound_sys:
+                c = max(c - bound_sys[sysd.id], 0.0)
             al = _alphas(sysd.pka, ph)
             for j, a in enumerate(al):
                 charge += (sysd.z0 - j) * c * a
@@ -195,7 +214,49 @@ def speciate(aq: dict, vol_ml: float, t: float) -> Speciation:
             hi = mid
     ph = 0.5 * (lo + hi)
     free = evaluate(ph, full=True)
-    return Speciation(ph, 10 ** (-ph), kw / 10 ** (-ph), free, vol_l, t)
+    sp = Speciation(ph, 10 ** (-ph), kw / 10 ** (-ph), free, vol_l, t)
+    ionic = 0.0
+    for name, c in free.items():
+        z = species_charge(name)
+        if z:
+            ionic += c * z * z
+    sp.ionic = 0.5 * ionic
+    sp.tot = tot
+    return sp
+
+
+_CHARGE_CACHE: dict[str, int] = {}
+
+
+def species_charge(name: str) -> int:
+    z = _CHARGE_CACHE.get(name)
+    if z is not None:
+        return z
+    z = 0
+    if name in ("H+",):
+        z = 1
+    elif name == "OH-":
+        z = -1
+    elif name in IONS:
+        z = IONS[name].charge
+    elif name in _CX_BY_ID:
+        z = _CX_BY_ID[name].charge
+    else:
+        for sysd in ACIDS.values():
+            if name in sysd.forms:
+                z = sysd.z0 - sysd.forms.index(name)
+                break
+    _CHARGE_CACHE[name] = z
+    return z
+
+
+def log_gamma(z: int, ionic: float) -> float:
+    """Równanie Daviesa (siła jonowa ograniczona do 1 mol/dm³)."""
+    if not z or ionic <= 0:
+        return 0.0
+    i = min(ionic, 1.0)
+    si = math.sqrt(i)
+    return -0.51 * z * z * (si / (1 + si) - 0.3 * i)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -233,11 +294,19 @@ def log_ksp(s: Solid, t: float) -> float:
 
 def saturation_index(s: Solid, sp: Speciation) -> float:
     lq = 0.0
+    act = s.kind == "ppt" and sp.ionic > 1e-4
+    salt = s.kind == "salt" and getattr(sp, "tot", None) is not None
     for name, nu in s.comp:
-        c = sp.free.get(name, 0.0)
+        if salt and name != "OH-":
+            # rozpuszczalność soli z tablic dotyczy całkowitej ilości rozpuszczonej soli
+            c = sp.tot.get(component_of(name) or name, 0.0)
+        else:
+            c = sp.free.get(name, 0.0)
         if c <= 0:
             return -99.0
         lq += nu * math.log10(c)
+        if act:
+            lq += nu * log_gamma(species_charge(name), sp.ionic)
     return lq - log_ksp(s, sp.t)
 
 

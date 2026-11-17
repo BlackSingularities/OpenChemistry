@@ -167,4 +167,5 @@ export interface ExpDetail {
   steps: ExpStep[]
   tags: string[]
   setup: { id: string; etype: string; x: number | null; label?: string | null }[]
+  materials?: { reagents: string[]; equipment: string[]; tools: string[] }
 }

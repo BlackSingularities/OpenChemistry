@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Beaker, FlaskConical, Search, Wrench, X } from 'lucide-react'
 import { useLab } from '../store'
 import { shelfPointerDown } from '../dnd'
@@ -25,12 +25,28 @@ export default function Shelf({ onClose }: { onClose?: () => void }) {
   const [tab, setTab] = useState<'equipment' | 'reagents' | 'tools'>('reagents')
   const [q, setQ] = useState('')
   const [group, setGroup] = useState<string>('')
+  const experiment = useLab((s) => s.experiment)
+  const [showAll, setShowAll] = useState(false)
+  useEffect(() => { setShowAll(false); setGroup('') }, [experiment?.id])
+  const limited = Boolean(experiment?.materials) && !showAll
+  const allowed = useMemo(() => {
+    const m = experiment?.materials
+    return {
+      reagents: new Set(m?.reagents || []),
+      equipment: new Set(m?.equipment || []),
+      tools: new Set([...(m?.tools || []), 'stir', 'thermometer', 'ph_meter']),
+    }
+  }, [experiment])
+  const okR = (id: string) => !limited || allowed.reagents.has(id)
+  const okE = (id: string) => !limited || allowed.equipment.has(id)
+  const okT = (id: string) => !limited || allowed.tools.has(id)
 
   const groups = useMemo(() => {
     if (!catalog) return []
-    const src = tab === 'equipment' ? catalog.equipment : tab === 'reagents' ? catalog.reagents : catalog.tools
+    const src: any[] = tab === 'equipment' ? catalog.equipment.filter((x) => okE(x.id))
+      : tab === 'reagents' ? catalog.reagents.filter((x) => okR(x.id)) : catalog.tools.filter((x) => okT(x.id))
     return Array.from(new Set(src.map((x: any) => x.group)))
-  }, [catalog, tab])
+  }, [catalog, tab, limited, allowed])
 
   if (!catalog) return <aside className="shelf"><div className="loading">Ładowanie półki…</div></aside>
 
@@ -67,6 +83,15 @@ export default function Shelf({ onClose }: { onClose?: () => void }) {
           </button>
           {onClose && <button className="icon-only close-shelf" onClick={onClose} aria-label="Zamknij półkę"><X size={16} /></button>}
         </div>
+        {experiment?.materials && (
+          <div className="scope">
+            <button className={!showAll ? 'on' : ''} onClick={() => { setShowAll(false); setGroup('') }}>Do tego doświadczenia</button>
+            <button className={showAll ? 'on' : ''} onClick={() => { setShowAll(true); setGroup('') }}>Cała półka</button>
+          </div>
+        )}
+        {experiment && showAll && (
+          <p className="scope-note">Możesz dodać dowolny odczynnik – silnik policzy reakcję, ale wynik może odbiegać od opisu doświadczenia.</p>
+        )}
         <label className="search">
           <Search size={14} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Szukaj (nazwa lub wzór)…" />
@@ -81,14 +106,14 @@ export default function Shelf({ onClose }: { onClose?: () => void }) {
         </p>
       </div>
       <div className="shelf-list">
-        {tab === 'equipment' && catalog.equipment.filter((e) => (!group || e.group === group) && match(e.name)).map((e) => (
+        {tab === 'equipment' && catalog.equipment.filter((e) => okE(e.id) && (!group || e.group === group) && match(e.name)).map((e) => (
           <div key={e.id} className="shelf-item" title={e.desc}
                onPointerDown={shelfPointerDown({ kind: 'equipment', id: e.id, label: e.name }, () => useLab.getState().addVessel(e.id))}>
             <span className={`eq-icon eq-${e.id}`} />
             <div><b>{e.name}</b>{e.cap > 0 && <small>{e.cap} mL{e.heatable ? ' · do ogrzewania' : ''}</small>}</div>
           </div>
         ))}
-        {tab === 'reagents' && catalog.reagents.filter((r) => (!group || r.group === group) && match(r.name, r.formula)).map((r) => (
+        {tab === 'reagents' && catalog.reagents.filter((r) => okR(r.id) && (!group || r.group === group) && match(r.name, r.formula)).map((r) => (
           <div key={r.id} className={`shelf-item${pick?.kind === 'reagent' && pick.id === r.id ? ' picked' : ''}`} title={r.note || r.name}
                onPointerDown={shelfPointerDown({ kind: 'reagent', id: r.id, label: r.name, color: r.color }, () => clickReagent(r.id))}>
             <ReagentSwatch r={r} />
@@ -100,7 +125,7 @@ export default function Shelf({ onClose }: { onClose?: () => void }) {
             </div>
           </div>
         ))}
-        {tab === 'tools' && catalog.tools.filter((t) => (!group || t.group === group) && match(t.name)).map((t) => (
+        {tab === 'tools' && catalog.tools.filter((t) => okT(t.id) && (!group || t.group === group) && match(t.name)).map((t) => (
           <div key={t.id} className={`shelf-item${pick?.kind === 'tool' && pick.id === t.id ? ' picked' : ''}`} title={t.desc}
                onPointerDown={shelfPointerDown({ kind: 'tool', id: t.id, label: t.name }, () => clickTool(t.id))}>
             <span className={`tool-icon tool-${t.kind}`} />

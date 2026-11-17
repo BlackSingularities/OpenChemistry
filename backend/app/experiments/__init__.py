@@ -211,12 +211,43 @@ def experiment_list():
             "experiments": out}
 
 
+def materials(e: Exp) -> dict:
+    """Odczynniki, sprzęt i narzędzia potrzebne w doświadczeniu (do ograniczenia półki)."""
+    reagents, equipment, tools = [], [], []
+
+    def add(lst, x):
+        if x and x not in lst:
+            lst.append(x)
+    for spec in e.setup:
+        add(equipment, spec["etype"])
+        for rid, _a in spec["fill"]:
+            add(reagents, rid)
+        if spec.get("gas"):
+            add(reagents, spec["gas"])
+        if spec.get("heat"):
+            add(tools, spec["heat"])
+    for st in e.steps:
+        for a in st["actions"]:
+            op = a.get("op")
+            if op == "reagent":
+                add(reagents, a.get("reagent"))
+            elif op == "test":
+                add(tools, a.get("tool"))
+            elif op == "heat" and a.get("source"):
+                add(tools, a["source"])
+            elif op in ("stir", "shake"):
+                add(tools, "stir")
+            elif op == "ignite":
+                add(tools, "ignite")
+    return {"reagents": reagents, "equipment": equipment, "tools": tools}
+
+
 @lru_cache(maxsize=512)
 def _detail(eid):
     e = REGISTRY[eid]
     return {"id": e.id, "title": e.title, "cat": e.cat, "catName": CAT_NAMES.get(e.cat, e.cat), "level": e.level,
             "summary": e.summary, "theory": e.theory, "equations": e.equations, "safety": e.safety,
-            "observe": e.observe, "steps": e.steps, "tags": list(e.tags),
+            "observe": e.observe, "steps": e.steps, "tags": list(e.tags), "materials": materials(e),
             "setup": [{"id": s["id"], "etype": s["etype"], "x": s.get("x"), "label": s.get("label")} for s in e.setup]}
 
 

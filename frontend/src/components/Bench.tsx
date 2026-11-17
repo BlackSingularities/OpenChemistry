@@ -92,7 +92,7 @@ function Readings({ p }: { p: Placed }) {
   if (Math.abs(v.T - 20) > 0.6 || v.heat) chips.push(`${fmt(v.T, 0)} °C`)
   if (v.pH !== null && v.vol > 0.3 && v.type !== 'burette') chips.push(`pH ${fmt(v.pH, 1)}`)
   if (!chips.length) return null
-  return <div className="readings">{chips.map((c) => <span key={c}>{c}</span>)}</div>
+  return <div className={`readings${p.w < 50 ? ' narrow' : ''}`}>{chips.map((c) => <span key={c}>{c}</span>)}</div>
 }
 
 export default function Bench() {
